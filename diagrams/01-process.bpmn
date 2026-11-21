@@ -1,0 +1,605 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_Substitution" targetNamespace="https://example.org/architecture/substitution" exporter="Architecture source" exporterVersion="1">
+  <bpmn:error id="Error_Model" errorCode="MODEL_UNAVAILABLE" name="Модель недоступна или ответ некорректен"/>
+  <bpmn:error id="Error_Stock" errorCode="OFFER_CHANGED" name="Остаток или согласованная цена изменились"/>
+  <bpmn:message id="Message_Offer" name="Предложение: товар, количество и цена"/>
+  <bpmn:message id="Message_Reply" name="Явное согласие или отказ"/>
+  <bpmn:dataStore id="Store_Events" name="Журнал решений" isUnlimited="true"/>
+  <bpmn:message id="Message_NoAlternative" name="Сообщение об отсутствии подходящей замены"/>
+  <bpmn:message id="Message_NoticeReceived" name="Подтверждение получения сообщения"/>
+  <bpmn:collaboration id="Collaboration_Substitution">
+    <bpmn:participant id="Participant_Vkusvill" name="ВкусВилл: подбор замены" processRef="Process_Substitution"/>
+    <bpmn:participant id="Participant_Customer" name="Покупатель"/>
+    <bpmn:messageFlow id="M_Offer" sourceRef="B06" targetRef="Participant_Customer" name="Товар и цена" messageRef="Message_Offer"/>
+    <bpmn:messageFlow id="M_Reply" sourceRef="Participant_Customer" targetRef="B06" name="Согласие / отказ" messageRef="Message_Reply"/>
+    <bpmn:messageFlow id="M_NoAlternative" sourceRef="B10" targetRef="Participant_Customer" name="Нет&#10;замены" messageRef="Message_NoAlternative"/>
+    <bpmn:messageFlow id="M_NoticeReceived" sourceRef="Participant_Customer" targetRef="B10" name="Принято" messageRef="Message_NoticeReceived"/>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Substitution" name="Подбор и согласование замены одной позиции" isExecutable="false">
+    <bpmn:documentation>Архитектурная реконструкция. Один отсутствующий фасованный товар в непустом заказе. Технические повторы с неизменным decision_id не меняют результат. B04 использует C3 ML-сервис; B09 завершает запись исхода в C4 Журнал решений.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_Roles">
+      <bpmn:lane id="Lane_Picker" name="Сборщик">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B01</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B05</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G04</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B06</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_Deadline</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B10</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_NotifyDeadline</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Service" name="Сервис подбора">
+        <bpmn:flowNodeRef>B02</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G01</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B03</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G02</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G03</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G_MergeOffer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G05</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B07</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_Stock</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B08</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G_MergeResult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>B09</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Model" name="ML-сервис">
+        <bpmn:flowNodeRef>B04</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E_Model</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Товар не найден&#10;при сборке">
+      <bpmn:outgoing>F_Start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="B01" name="B01  Зафиксировать&#10;отсутствие товара">
+      <bpmn:incoming>F_Start</bpmn:incoming>
+      <bpmn:outgoing>F_Settings</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="B02" name="B02  Проверить&#10;настройку замены">
+      <bpmn:incoming>F_Settings</bpmn:incoming>
+      <bpmn:outgoing>F_CheckPermission</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G01" name="Согласование&#10;разрешено?" gatewayDirection="Diverging" default="F_NoPermission">
+      <bpmn:incoming>F_CheckPermission</bpmn:incoming>
+      <bpmn:outgoing>F_Allowed</bpmn:outgoing>
+      <bpmn:outgoing>F_NoPermission</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="B03" name="B03  Отобрать&#10;допустимые аналоги">
+      <bpmn:incoming>F_Allowed</bpmn:incoming>
+      <bpmn:outgoing>F_CheckCandidates</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G02" name="Есть допустимые&#10;аналоги?" gatewayDirection="Diverging" default="F_NoCandidates">
+      <bpmn:incoming>F_CheckCandidates</bpmn:incoming>
+      <bpmn:outgoing>F_Candidates</bpmn:outgoing>
+      <bpmn:outgoing>F_NoCandidates</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="B04" name="B04  Оценить&#10;аналоги моделью">
+      <bpmn:incoming>F_Candidates</bpmn:incoming>
+      <bpmn:outgoing>F_CheckScore</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="E_Model" name="Ошибка / таймаут&#10;800 мс" attachedToRef="B04" cancelActivity="true">
+      <bpmn:outgoing>F_ModelFailure</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_Model" errorRef="Error_Model"/>
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="G03" name="Лучший p&#10;не ниже 0.70?" gatewayDirection="Diverging" default="F_LowScore">
+      <bpmn:incoming>F_CheckScore</bpmn:incoming>
+      <bpmn:outgoing>F_LowScore</bpmn:outgoing>
+      <bpmn:outgoing>F_GoodScore</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="B05" name="B05  Выбрать аналог&#10;вручную&#10;из допустимого списка">
+      <bpmn:incoming>F_ModelFailure</bpmn:incoming>
+      <bpmn:incoming>F_LowScore</bpmn:incoming>
+      <bpmn:outgoing>F_CheckManual</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="G04" name="Аналог&#10;выбран?" gatewayDirection="Diverging" default="F_NoManualChoice">
+      <bpmn:incoming>F_CheckManual</bpmn:incoming>
+      <bpmn:outgoing>F_ManualSelected</bpmn:outgoing>
+      <bpmn:outgoing>F_NoManualChoice</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="G_MergeOffer" name="" gatewayDirection="Converging">
+      <bpmn:incoming>F_GoodScore</bpmn:incoming>
+      <bpmn:incoming>F_ManualSelected</bpmn:incoming>
+      <bpmn:outgoing>F_ToContact</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="B06" name="B06  Согласовать&#10;аналог и цену&#10;по телефону">
+      <bpmn:incoming>F_ToContact</bpmn:incoming>
+      <bpmn:outgoing>F_Consent</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="E_Deadline" name="Наступил срок&#10;окончания сборки" attachedToRef="B06" cancelActivity="true">
+      <bpmn:outgoing>F_NoAnswer</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Deadline">
+        <bpmn:timeDate>= assembly_deadline</bpmn:timeDate>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="G05" name="Покупатель&#10;согласен?" gatewayDirection="Diverging" default="F_Declined">
+      <bpmn:incoming>F_Consent</bpmn:incoming>
+      <bpmn:outgoing>F_Accepted</bpmn:outgoing>
+      <bpmn:outgoing>F_Declined</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="B07" name="B07  Зарезервировать&#10;аналог и применить&#10;замену">
+      <bpmn:incoming>F_Accepted</bpmn:incoming>
+      <bpmn:outgoing>F_Replaced</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="E_Stock" name="Остаток или цена&#10;изменились" attachedToRef="B07" cancelActivity="true">
+      <bpmn:outgoing>F_StockConflict</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_Stock" errorRef="Error_Stock"/>
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="B10" name="B10  Сообщить&#10;об отсутствии&#10;подходящей замены">
+      <bpmn:incoming>F_NoCandidates</bpmn:incoming>
+      <bpmn:incoming>F_NoManualChoice</bpmn:incoming>
+      <bpmn:outgoing>F_Notified</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="E_NotifyDeadline" name="Наступил срок&#10;окончания сборки" attachedToRef="B10" cancelActivity="true">
+      <bpmn:outgoing>F_NotifyTimeout</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_NotifyDeadline">
+        <bpmn:timeDate>= assembly_deadline</bpmn:timeDate>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="B08" name="B08  Удалить&#10;отсутствующую позицию">
+      <bpmn:incoming>F_NotifyTimeout</bpmn:incoming>
+      <bpmn:incoming>F_Notified</bpmn:incoming>
+      <bpmn:incoming>F_NoPermission</bpmn:incoming>
+      <bpmn:incoming>F_NoAnswer</bpmn:incoming>
+      <bpmn:incoming>F_Declined</bpmn:incoming>
+      <bpmn:incoming>F_StockConflict</bpmn:incoming>
+      <bpmn:outgoing>F_Removed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G_MergeResult" name="" gatewayDirection="Converging">
+      <bpmn:incoming>F_Replaced</bpmn:incoming>
+      <bpmn:incoming>F_Removed</bpmn:incoming>
+      <bpmn:outgoing>F_Finalize</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="B09" name="B09  Сохранить&#10;показ, ответ и итог">
+      <bpmn:incoming>F_Finalize</bpmn:incoming>
+      <bpmn:outgoing>F_Finished</bpmn:outgoing>
+      <bpmn:ioSpecification>
+        <bpmn:dataOutput id="DataOutput_Outcome" name="Показ, ответ, итог и версия"/>
+        <bpmn:inputSet id="InputSet_Outcome"/>
+        <bpmn:outputSet id="OutputSet_Outcome">
+          <bpmn:dataOutputRefs>DataOutput_Outcome</bpmn:dataOutputRefs>
+        </bpmn:outputSet>
+      </bpmn:ioSpecification>
+      <bpmn:dataOutputAssociation id="A_Learning">
+        <bpmn:sourceRef>DataOutput_Outcome</bpmn:sourceRef>
+        <bpmn:targetRef>D1</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End" name="Позиция заменена или удалена;&#10;исход сохранен">
+      <bpmn:incoming>F_Finished</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:dataStoreReference id="D1" name="C4  Журнал решений&#10;Снимки, показы, ответы, версии&#10;Чтение задачей обучения C5" dataStoreRef="Store_Events"/>
+    <bpmn:textAnnotation id="Note_Scope">
+      <bpmn:text>Одна позиция непустого заказа.
+Порог, таймаут и устройство сервисов
+предложены в этой работе.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Note_ML">
+      <bpmn:text>CatBoost + калибровка
+p = вероятность согласия
+среди явных ответов.
+Ответ возвращается в C2.
+Ошибка или таймаут модели
+ведут к ручному выбору.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Note_Consent">
+      <bpmn:text>Предложение и снимок фиксируются
+до звонка. Без согласия покупателя
+замена не применяется.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Note_Label">
+      <bpmn:text>Явное согласие: label = 1.
+Явный отказ: label = 0.
+Нет ответа / нет показа: label = NULL.
+Сбой резерва не меняет уже
+записанное согласие.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:sequenceFlow id="F_Start" sourceRef="Start" targetRef="B01"/>
+    <bpmn:sequenceFlow id="F_Settings" sourceRef="B01" targetRef="B02"/>
+    <bpmn:sequenceFlow id="F_CheckPermission" sourceRef="B02" targetRef="G01"/>
+    <bpmn:sequenceFlow id="F_Allowed" sourceRef="G01" targetRef="B03" name="Да">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= replacement_allowed</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_NoPermission" sourceRef="G01" targetRef="B08" name="Нет: замены&#10;запрещены"/>
+    <bpmn:sequenceFlow id="F_CheckCandidates" sourceRef="B03" targetRef="G02"/>
+    <bpmn:sequenceFlow id="F_Candidates" sourceRef="G02" targetRef="B04" name="Да">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= candidates_count &gt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_NoCandidates" sourceRef="G02" targetRef="B10" name="Нет: нет&#10;аналогов"/>
+    <bpmn:sequenceFlow id="F_CheckScore" sourceRef="B04" targetRef="G03" name="Валидный ответ"/>
+    <bpmn:sequenceFlow id="F_ModelFailure" sourceRef="E_Model" targetRef="B05"/>
+    <bpmn:sequenceFlow id="F_LowScore" sourceRef="G03" targetRef="B05" name="Нет: p &lt; 0.70"/>
+    <bpmn:sequenceFlow id="F_GoodScore" sourceRef="G03" targetRef="G_MergeOffer" name="Да">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= top_score &gt;= 0.70</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_CheckManual" sourceRef="B05" targetRef="G04"/>
+    <bpmn:sequenceFlow id="F_ManualSelected" sourceRef="G04" targetRef="G_MergeOffer" name="Да">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= manual_candidate_id != null</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_NoManualChoice" sourceRef="G04" targetRef="B10" name="Нет"/>
+    <bpmn:sequenceFlow id="F_ToContact" sourceRef="G_MergeOffer" targetRef="B06"/>
+    <bpmn:sequenceFlow id="F_Consent" sourceRef="B06" targetRef="G05"/>
+    <bpmn:sequenceFlow id="F_NoAnswer" sourceRef="E_Deadline" targetRef="B08" name="Нет ответа"/>
+    <bpmn:sequenceFlow id="F_Accepted" sourceRef="G05" targetRef="B07" name="Да">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= consent = "accepted"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Declined" sourceRef="G05" targetRef="B08" name="Нет: отказ"/>
+    <bpmn:sequenceFlow id="F_StockConflict" sourceRef="E_Stock" targetRef="B08"/>
+    <bpmn:sequenceFlow id="F_Replaced" sourceRef="B07" targetRef="G_MergeResult" name="Замена применена"/>
+    <bpmn:sequenceFlow id="F_Notified" sourceRef="B10" targetRef="B08" name="Сообщено"/>
+    <bpmn:sequenceFlow id="F_NotifyTimeout" sourceRef="E_NotifyDeadline" targetRef="B08" name="Нет связи"/>
+    <bpmn:sequenceFlow id="F_Removed" sourceRef="B08" targetRef="G_MergeResult" name="Позиция удалена"/>
+    <bpmn:sequenceFlow id="F_Finalize" sourceRef="G_MergeResult" targetRef="B09"/>
+    <bpmn:sequenceFlow id="F_Finished" sourceRef="B09" targetRef="End"/>
+    <bpmn:association id="A_Label" sourceRef="D1" targetRef="Note_Label" associationDirection="None"/>
+    <bpmn:association id="A_Consent" sourceRef="B06" targetRef="Note_Consent" associationDirection="None"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Substitution" name="BPMN: подбор замены одной позиции">
+    <bpmndi:BPMNPlane id="Plane_Substitution" bpmnElement="Collaboration_Substitution">
+      <bpmndi:BPMNShape id="Participant_Vkusvill_di" bpmnElement="Participant_Vkusvill" isHorizontal="false" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="270" y="90" width="1400" height="2520"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Picker_di" bpmnElement="Lane_Picker" isHorizontal="false" bioc:fill="#f8fafc" bioc:stroke="#334155">
+        <dc:Bounds x="270" y="120" width="430" height="2490"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Service_di" bpmnElement="Lane_Service" isHorizontal="false" bioc:fill="#f8fafc" bioc:stroke="#334155">
+        <dc:Bounds x="700" y="120" width="500" height="2490"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Model_di" bpmnElement="Lane_Model" isHorizontal="false" bioc:fill="#edf7f5" bioc:stroke="#334155">
+        <dc:Bounds x="1200" y="120" width="470" height="2490"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Customer_di" bpmnElement="Participant_Customer" isHorizontal="true" bioc:fill="#f1f5f9" bioc:stroke="#334155">
+        <dc:Bounds x="25" y="1410" width="220" height="650"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start" bioc:fill="#dcfce7" bioc:stroke="#334155">
+        <dc:Bounds x="452" y="190" width="40" height="40"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="290" y="185" width="150" height="50"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B01_di" bpmnElement="B01" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="355" y="275" width="235" height="95"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B02_di" bpmnElement="B02" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="825" y="275" width="260" height="95"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G01_di" bpmnElement="G01" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="928" y="420" width="54" height="54"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="745" y="410" width="170" height="60"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B03_di" bpmnElement="B03" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="825" y="545" width="260" height="95"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G02_di" bpmnElement="G02" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="928" y="715" width="54" height="54"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="822" y="770" width="260" height="45"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B04_di" bpmnElement="B04" bioc:fill="#cce8e3" bioc:stroke="#334155">
+        <dc:Bounds x="1340" y="825" width="260" height="100"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E_Model_di" bpmnElement="E_Model" bioc:fill="#fff7ed" bioc:stroke="#334155">
+        <dc:Bounds x="1370" y="907" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1420" y="930" width="220" height="50"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G03_di" bpmnElement="G03" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="928" y="985" width="54" height="54"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1005" y="1040" width="170" height="50"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B05_di" bpmnElement="B05" bioc:fill="#fff0d8" bioc:stroke="#334155">
+        <dc:Bounds x="355" y="1080" width="235" height="105"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G04_di" bpmnElement="G04" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="445" y="1245" width="54" height="54"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="325" y="1305" width="240" height="40"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G_MergeOffer_di" bpmnElement="G_MergeOffer" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="928" y="1280" width="54" height="54"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B06_di" bpmnElement="B06" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="355" y="1425" width="235" height="110"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E_Deadline_di" bpmnElement="E_Deadline" bioc:fill="#fff7ed" bioc:stroke="#334155">
+        <dc:Bounds x="392" y="1517" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="440" y="1538" width="240" height="50"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G05_di" bpmnElement="G05" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="928" y="1575" width="54" height="54"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="820" y="1510" width="260" height="45"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B07_di" bpmnElement="B07" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="825" y="1700" width="260" height="105"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E_Stock_di" bpmnElement="E_Stock" bioc:fill="#fff7ed" bioc:stroke="#334155">
+        <dc:Bounds x="1047" y="1787" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1090" y="1805" width="190" height="55"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B08_di" bpmnElement="B08" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="825" y="1930" width="260" height="95"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G_MergeResult_di" bpmnElement="G_MergeResult" isMarkerVisible="true" bioc:fill="#fef3c7" bioc:stroke="#334155">
+        <dc:Bounds x="928" y="2145" width="54" height="54"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B09_di" bpmnElement="B09" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="825" y="2280" width="260" height="105"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_di" bpmnElement="End" bioc:fill="#dcfce7" bioc:stroke="#334155">
+        <dc:Bounds x="935" y="2490" width="40" height="40"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="745" y="2540" width="420" height="50"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="D1_di" bpmnElement="D1" bioc:fill="#e0f2fe" bioc:stroke="#334155">
+        <dc:Bounds x="1330" y="2280" width="180" height="95"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1240" y="2380" width="400" height="70"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Scope_di" bpmnElement="Note_Scope" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="1270" y="200" width="360" height="100"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_ML_di" bpmnElement="Note_ML" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="1260" y="570" width="370" height="150"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Consent_di" bpmnElement="Note_Consent" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="1260" y="1400" width="370" height="110"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Label_di" bpmnElement="Note_Label" bioc:fill="#ffffff" bioc:stroke="#334155">
+        <dc:Bounds x="1240" y="2470" width="400" height="125"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="F_Start_di" bpmnElement="F_Start">
+        <di:waypoint x="472" y="230"/>
+        <di:waypoint x="472" y="275"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Settings_di" bpmnElement="F_Settings">
+        <di:waypoint x="590" y="322"/>
+        <di:waypoint x="825" y="322"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_CheckPermission_di" bpmnElement="F_CheckPermission">
+        <di:waypoint x="955" y="370"/>
+        <di:waypoint x="955" y="420"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Allowed_di" bpmnElement="F_Allowed">
+        <di:waypoint x="955" y="474"/>
+        <di:waypoint x="955" y="545"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="980" y="499" width="65" height="28"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_NoPermission_di" bpmnElement="F_NoPermission">
+        <di:waypoint x="982" y="447"/>
+        <di:waypoint x="1190" y="447"/>
+        <di:waypoint x="1190" y="1870"/>
+        <di:waypoint x="990" y="1870"/>
+        <di:waypoint x="990" y="1930"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1000" y="410" width="180" height="36"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_CheckCandidates_di" bpmnElement="F_CheckCandidates">
+        <di:waypoint x="955" y="640"/>
+        <di:waypoint x="955" y="715"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Candidates_di" bpmnElement="F_Candidates">
+        <di:waypoint x="982" y="742"/>
+        <di:waypoint x="1470" y="742"/>
+        <di:waypoint x="1470" y="825"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1060" y="705" width="70" height="30"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_CheckScore_di" bpmnElement="F_CheckScore">
+        <di:waypoint x="1340" y="875"/>
+        <di:waypoint x="1110" y="875"/>
+        <di:waypoint x="1110" y="1012"/>
+        <di:waypoint x="982" y="1012"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1125" y="838" width="185" height="30"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_ModelFailure_di" bpmnElement="F_ModelFailure">
+        <di:waypoint x="1388" y="943"/>
+        <di:waypoint x="1388" y="960"/>
+        <di:waypoint x="650" y="960"/>
+        <di:waypoint x="650" y="1110"/>
+        <di:waypoint x="590" y="1110"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_LowScore_di" bpmnElement="F_LowScore">
+        <di:waypoint x="928" y="1012"/>
+        <di:waypoint x="780" y="1012"/>
+        <di:waypoint x="780" y="1155"/>
+        <di:waypoint x="590" y="1155"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="792" y="1035" width="130" height="36"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_GoodScore_di" bpmnElement="F_GoodScore">
+        <di:waypoint x="955" y="1039"/>
+        <di:waypoint x="955" y="1280"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="973" y="1140" width="70" height="28"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_CheckManual_di" bpmnElement="F_CheckManual">
+        <di:waypoint x="472" y="1185"/>
+        <di:waypoint x="472" y="1245"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_ManualSelected_di" bpmnElement="F_ManualSelected">
+        <di:waypoint x="499" y="1272"/>
+        <di:waypoint x="650" y="1272"/>
+        <di:waypoint x="650" y="1307"/>
+        <di:waypoint x="928" y="1307"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="560" y="1233" width="70" height="28"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_ToContact_di" bpmnElement="F_ToContact">
+        <di:waypoint x="955" y="1334"/>
+        <di:waypoint x="955" y="1380"/>
+        <di:waypoint x="472" y="1380"/>
+        <di:waypoint x="472" y="1425"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Consent_di" bpmnElement="F_Consent">
+        <di:waypoint x="590" y="1480"/>
+        <di:waypoint x="810" y="1480"/>
+        <di:waypoint x="810" y="1602"/>
+        <di:waypoint x="928" y="1602"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_NoAnswer_di" bpmnElement="F_NoAnswer">
+        <di:waypoint x="410" y="1553"/>
+        <di:waypoint x="410" y="1835"/>
+        <di:waypoint x="925" y="1835"/>
+        <di:waypoint x="925" y="1930"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="430" y="1745" width="160" height="32"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Accepted_di" bpmnElement="F_Accepted">
+        <di:waypoint x="955" y="1629"/>
+        <di:waypoint x="955" y="1700"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="975" y="1640" width="70" height="28"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Declined_di" bpmnElement="F_Declined">
+        <di:waypoint x="982" y="1602"/>
+        <di:waypoint x="1140" y="1602"/>
+        <di:waypoint x="1140" y="1905"/>
+        <di:waypoint x="1035" y="1905"/>
+        <di:waypoint x="1035" y="1930"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1008" y="1555" width="130" height="32"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_StockConflict_di" bpmnElement="F_StockConflict">
+        <di:waypoint x="1065" y="1823"/>
+        <di:waypoint x="1065" y="1930"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Replaced_di" bpmnElement="F_Replaced">
+        <di:waypoint x="825" y="1752"/>
+        <di:waypoint x="780" y="1752"/>
+        <di:waypoint x="780" y="2172"/>
+        <di:waypoint x="928" y="2172"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="600" y="2090" width="180" height="45"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Removed_di" bpmnElement="F_Removed">
+        <di:waypoint x="955" y="2025"/>
+        <di:waypoint x="955" y="2145"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="976" y="2060" width="180" height="32"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Finalize_di" bpmnElement="F_Finalize">
+        <di:waypoint x="955" y="2199"/>
+        <di:waypoint x="955" y="2280"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Finished_di" bpmnElement="F_Finished">
+        <di:waypoint x="955" y="2385"/>
+        <di:waypoint x="955" y="2490"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="M_Offer_di" bpmnElement="M_Offer">
+        <di:waypoint x="355" y="1460"/>
+        <di:waypoint x="245" y="1460"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="255" y="1415" width="100" height="40"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="M_Reply_di" bpmnElement="M_Reply">
+        <di:waypoint x="245" y="1500"/>
+        <di:waypoint x="355" y="1500"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="248" y="1510" width="110" height="40"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="A_Learning_di" bpmnElement="A_Learning">
+        <di:waypoint x="1085" y="2332"/>
+        <di:waypoint x="1330" y="2332"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1110" y="2290" width="190" height="32"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="A_Label_di" bpmnElement="A_Label">
+        <di:waypoint x="1420" y="2375"/>
+        <di:waypoint x="1420" y="2470"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="A_Consent_di" bpmnElement="A_Consent">
+        <di:waypoint x="590" y="1450"/>
+        <di:waypoint x="1220" y="1450"/>
+        <di:waypoint x="1260" y="1450"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="B10_di" bpmnElement="B10">
+        <dc:Bounds x="355" y="1930" width="235" height="105"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E_NotifyDeadline_di" bpmnElement="E_NotifyDeadline">
+        <dc:Bounds x="572" y="1987" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="400" y="2050" width="260" height="45"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="F_NoCandidates_di" bpmnElement="F_NoCandidates">
+        <di:waypoint x="928" y="742"/>
+        <di:waypoint x="725" y="742"/>
+        <di:waypoint x="725" y="1885"/>
+        <di:waypoint x="472" y="1885"/>
+        <di:waypoint x="472" y="1930"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="740" y="690" width="170" height="40"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_NoManualChoice_di" bpmnElement="F_NoManualChoice">
+        <di:waypoint x="445" y="1272"/>
+        <di:waypoint x="310" y="1272"/>
+        <di:waypoint x="310" y="1905"/>
+        <di:waypoint x="402" y="1905"/>
+        <di:waypoint x="402" y="1930"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="325" y="1230" width="70" height="28"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Notified_di" bpmnElement="F_Notified">
+        <di:waypoint x="590" y="1955"/>
+        <di:waypoint x="825" y="1955"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="615" y="1917" width="185" height="30"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_NotifyTimeout_di" bpmnElement="F_NotifyTimeout">
+        <di:waypoint x="608" y="2005"/>
+        <di:waypoint x="825" y="2005"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="615" y="2010" width="185" height="30"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="M_NoAlternative_di" bpmnElement="M_NoAlternative">
+        <di:waypoint x="355" y="1950"/>
+        <di:waypoint x="245" y="1950"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="250" y="1907" width="100" height="40"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="M_NoticeReceived_di" bpmnElement="M_NoticeReceived">
+        <di:waypoint x="245" y="1990"/>
+        <di:waypoint x="355" y="1990"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="245" y="2002" width="110" height="30"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

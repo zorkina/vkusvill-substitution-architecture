@@ -1,0 +1,38 @@
+{
+  "sources_and_renders": {
+    "diagrams/01-process.bpmn": "77c10a3bbc6a5a3934224e0c8b891bd2e741e935b997a408196c91fee4dab43a",
+    "diagrams/01-process.png": "3b41d1c42e7bd7fb5fdf9d18f396173923ec8df49327a8b8047a816354c60554",
+    "diagrams/01-process.puml": "5001caf54bb99e8fd3304e953305f6eac5726c023e7fcea44cc095e79f0ba6ab",
+    "diagrams/01-process.svg": "08966e07812d4f7c0895879bdc65ba47a346b975d22648f07a95fbefc4fed023",
+    "diagrams/02-context.png": "1a8413f839bb40c2ceef7db5ff754c6b9a428c0640b0634df7f74ca732a97f81",
+    "diagrams/02-context.puml": "02f215d0e3a53ac0c7705884d5d7959f00099dbe5e78df3b15ecddf544c44ba0",
+    "diagrams/02-context.svg": "3ee9454d0c1540a1152920c7ec2f8dd22298e7a6ada5439c6eb76194fa9cc033",
+    "diagrams/03-containers.png": "373bde066208903c3462131df8bb136fcdae3c9d6eb0e7c281c200dbca162ae2",
+    "diagrams/03-containers.puml": "13c9026224f0fd457e353af4cf0663020a784faaadd04407b8ce3b6b8b900425",
+    "diagrams/03-containers.svg": "df6f671e522adea04b1d305685adc9283284a8014939d58f56d902a58ca1e59e",
+    "diagrams/04-ml-components.png": "2c03e367d652882092a50635b9a1643745b4b6e04ebb925220a4a8317b800f7a",
+    "diagrams/04-ml-components.puml": "2524b75de9276c070e3c7daaf1f95066ec6524a8a53618d076409a79109fc5be",
+    "diagrams/04-ml-components.svg": "28250c03235c3a27cd39dbece598ba7847e13c894d220375ddc48acac65cf3c8",
+    "diagrams/style.puml": "faf545bf4b8ac448238c1b3bc9f2481a23796017979dba835f69bbd6b0eb0d45",
+    "scripts/export_bpmn.py": "a92b4d0a3cf1470b7a60548bf2e34beace62e26f67e170e0b75996f7bb3e4338",
+    "scripts/render.sh": "7bee96e871b996d5a86e959ed41b067a46c2a332d9b1688a4949121e5ffd8905"
+  },
+  "png_dimensions": {
+    "01-process": [
+      2278,
+      3851
+    ],
+    "02-context": [
+      1333,
+      931
+    ],
+    "03-containers": [
+      1893,
+      1356
+    ],
+    "04-ml-components": [
+      1226,
+      1493
+    ]
+  }
+}

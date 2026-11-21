@@ -1,0 +1,53 @@
+@startuml 04-ml-components
+!include <C4/C4_Component>
+!include style.puml
+
+title C4 L3 · Компоненты ML-сервиса
+LAYOUT_TOP_DOWN()
+
+Container_Boundary(ml, "C3 · ML-сервис [Python / CatBoost]") {
+    Component(handler, "Обработчик API", "Компонент · Python / FastAPI", "Проверяет snapshot.\nФиксирует один bundle на запрос.\nBPMN B04: Оценить аналоги моделью.")
+    Component(loader, "Загрузчик версий", "Компонент · Python / S3 client", "Проверяет checksum и схему bundle.\nАтомарно меняет активную ссылку.\nПри сбое сохраняет рабочую версию.")
+    Component(features, "Построитель признаков", "Компонент · Python", "Препроцессинг из bundle:\nсвойства пары товаров, различия\nцены и объема, контекст заказа.")
+    Component(predictor, "Предиктор CatBoost", "Компонент · CatBoost CPU", "Считает raw margin по кандидатам.\nМодель берется из bundle,\nзакрепленного за запросом.")
+    Component(calibrator, "Калибратор", "Компонент · Python", "Sigmoid-калибровка raw margin.\nScore: вероятность согласия\nсреди случаев с явным ответом.\nПараметры из того же bundle.")
+    Component(response, "Сборщик ответа", "Компонент · Python", "Проверяет score: конечный, в [0; 1].\nСортирует кандидатов; возвращает\nstatus, features_schema и model_version.")
+}
+
+Rel_R(handler, loader, "Закрепляет bundle\nна весь запрос", "Вызов в памяти")
+Rel_D(handler, features, "Передает snapshot + bundle", "Вызов Python")
+Rel_R(features, predictor, "Передает признаки\nи ту же версию модели", "Вызов Python")
+Rel_D(predictor, calibrator, "Передает raw margin\nи калибратор bundle", "Вызов Python")
+Rel_L(calibrator, response, "Передает candidate_id, score\nи model_version", "Вызов Python")
+Lay_D(loader, predictor)
+Lay_D(features, response)
+
+note top of handler
+Вход от C2: decision_id и snapshot заказа/аналогов.
+Источники snapshot: Система заказов, Каталог и остатки.
+Будущие ответы покупателя не входят в признаки.
+end note
+
+note right of loader
+Вход из C6 через S3 API / HTTPS:
+active.json и неизменяемый bundle.
+Обновление не меняет версию
+у уже выполняющегося запроса.
+end note
+
+note bottom of response
+Выход в C2, результат BPMN B04:
+candidate_id, score, model_version, features_schema, status.
+Порог score >= 0,70 и запасной путь выбирает C2.
+При отсутствии рабочей модели возвращается недоступность.
+end note
+
+legend bottom left
+|= Обозначение |= Смысл |
+| <back:#E2F2F0>   </back> | Компонент: модуль внутри одного процесса C3 |
+| Пунктирная граница | Один развертываемый ML-сервис |
+| Направленная стрелка | Внутренний вызов и передаваемые данные |
+| <back:#FFF8E7>   </back> | Контракт на границе; другие контейнеры не раскрываются |
+| bundle | Одна версия модели, препроцессинга и калибратора |
+endlegend
+@enduml

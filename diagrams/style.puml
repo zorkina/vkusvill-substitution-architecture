@@ -1,0 +1,41 @@
+' Общий стиль схем C4. Включается после библиотеки соответствующего уровня.
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 15
+skinparam wrapWidth 320
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #52667A
+skinparam ArrowFontColor #33485C
+skinparam ArrowFontSize 15
+skinparam nodesep 35
+skinparam ranksep 35
+skinparam padding 8
+skinparam packageTitleAlignment left
+skinparam TitleFontColor #163A43
+skinparam TitleFontSize 23
+skinparam TitleFontStyle bold
+skinparam FooterFontColor #64748B
+skinparam FooterFontSize 11
+skinparam NoteBackgroundColor #FFF8E7
+skinparam NoteBorderColor #D4B57B
+skinparam NoteFontColor #59482D
+skinparam NoteFontSize 14
+skinparam LegendBackgroundColor #F6F8FA
+skinparam LegendBorderColor #D4DCE3
+skinparam LegendFontColor #33485C
+skinparam LegendFontSize 14
+
+!$TECHN_FONT_SIZE = 15
+
+UpdateElementStyle("person", $bgColor="#2F465B", $fontColor="#FFFFFF", $borderColor="#2F465B", $techn="Человек")
+UpdateElementStyle("system", $bgColor="#147D83", $fontColor="#FFFFFF", $borderColor="#0F6269", $techn="Система")
+UpdateElementStyle("external_system", $bgColor="#E8EDF2", $fontColor="#24394C", $borderColor="#A6B5C2", $techn="Внешняя система")
+UpdateElementStyle("container", $bgColor="#E2F2F0", $fontColor="#173E43", $borderColor="#2F8586")
+UpdateElementStyle("component", $bgColor="#E2F2F0", $fontColor="#173E43", $borderColor="#2F8586")
+
+UpdateBoundaryStyle("system", $type="Система")
+UpdateBoundaryStyle("container", $type="Контейнер")
+HIDE_STEREOTYPE()
+
+footer ВкусВилл | Подбор замены одной позиции | Архитектурная реконструкция

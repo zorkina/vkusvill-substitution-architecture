@@ -1,0 +1,65 @@
+@startuml 03-containers
+!include <C4/C4_Container>
+!include style.puml
+
+title C4 L2 · Контейнеры системы подбора замены
+LAYOUT_TOP_DOWN()
+skinparam linetype polyline
+skinparam NoteBackgroundColor #FFFFFF
+skinparam NoteBorderColor #D4DCE3
+skinparam NoteFontColor #33485C
+skinparam NoteFontSize 15
+
+Person(picker, "Сборщик", "Согласует замену по телефону.\nПереносит ответ покупателя в панель.")
+System_Ext(orders, "Система заказов", "Настройки заказа.\nАтомарный резерв и изменение позиции.")
+System_Ext(catalog, "Каталог и остатки", "Состав, свойства, цены\nи остатки товаров.")
+
+System_Boundary(system, "Система подбора замены") {
+    Container(ui, "C1 · Панель сборщика", "Контейнер · TypeScript / React", "Отсутствующая позиция, предложение,\nответ покупателя и итог.")
+    Container(api, "C2 · Сервис подбора", "Контейнер · Python / FastAPI", "Правила допуска и запасной выбор.\nПорог 0,70; таймаут ML 800 мс.\nИдемпотентность по decision_id.")
+    Container(ml, "C3 · ML-сервис", "Контейнер · Python / CatBoost", "Признаки и калиброванный score.\nВероятность согласия среди\nслучаев с явным ответом.\nОдна версия модели на запрос.")
+    ContainerDb(journal, "C4 · Журнал решений", "Контейнер · PostgreSQL", "Снимки признаков, показ, ответ\nи исход. model_version и source.\nПовторы событий исключаются.")
+    Container(training, "C5 · Задача обучения", "Контейнер · Python / CatBoost", "Ежедневный batch; временной split.\nОбучение, калибровка и сравнение\nкандидата с активной версией.")
+    ContainerDb(registry, "C6 · Реестр моделей", "Контейнер · S3 API / MinIO", "Неизменяемые bundle по версиям.\nМодель, препроцессинг, калибратор.\nУказатель active.json.")
+}
+
+Rel_D(picker, ui, "", "")
+note on link
+Передает отсутствие и ответ;
+получает аналог и итог
+[HTTPS]
+end note
+Rel_R(ui, api, "Передает позицию и ответ;\nполучает состояние", "HTTPS / JSON")
+Rel_L(api, orders, "", "")
+note on link
+Читает настройки;
+меняет позицию и резерв
+[HTTPS / JSON]
+end note
+Rel_R(api, catalog, "", "")
+note on link
+Читает атрибуты
+и доступные остатки
+[HTTPS / JSON]
+end note
+Rel_R(api, ml, "Передает snapshot;\nполучает оценку и версию", "HTTP / JSON · 800 мс")
+Rel_D(api, journal, "Сохраняет snapshot, показ,\nответ и итог", "SQL / TLS")
+Rel_L(training, journal, "Читает снимки\nи явную разметку", "SQL / TLS")
+Rel_R(training, registry, "Публикует bundle;\nобновляет active.json", "S3 API / HTTPS")
+Rel_D(ml, registry, "Загружает и проверяет bundle;\nатомарно активирует версию", "S3 API / HTTPS")
+
+Lay_R(journal, training)
+Lay_R(training, registry)
+Lay_D(api, training)
+Lay_D(ui, journal)
+
+legend bottom left
+|= Обозначение |= Смысл |
+| <back:#E2F2F0>    | Контейнер: приложение, batch или хранилище |
+| <back:#E8EDF2>    | Внешняя система |
+| Пунктирная граница | Система: шесть отдельно разворачиваемых частей |
+| Направленная стрелка | Инициатор взаимодействия; ответ указан в подписи |
+| Подпись в рамке | Данные и протокол связи |
+| Стек, порог, таймаут и расписание | Допущения реконструкции |
+endlegend
+@enduml
